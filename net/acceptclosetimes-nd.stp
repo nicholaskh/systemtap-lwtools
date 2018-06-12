@@ -1,0 +1,32 @@
+#!/usr/bin/stap
+
+global accepts, closes, argv1_int;
+
+probe begin {
+    if (argv_1 != "") {
+        argv1_int = strtol(argv_1, 10);
+    }
+    accepts = 0;
+    printf("Tracing pid %s\n", argv_1);
+    printf("%-28s %-8s %-8s\n", "TIME", "ACCEPTS", "CLOSES");
+}
+
+probe nd_syscall.accept.return,
+    nd_syscall.accept4.return
+{
+    if (argv_1 == "" || pid() == argv1_int) {
+        accepts++;
+    }
+}
+
+probe nd_syscall.close {
+    if (argv_1 == "" || pid() == argv1_int) {
+        closes++;
+    }
+}
+
+probe timer.s(1) {
+    printf("%-28s %-8d %-8d\n", ctime(), accepts, closes);
+    accepts = 0;
+    closes = 0;
+}
