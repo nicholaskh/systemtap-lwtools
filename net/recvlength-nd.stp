@@ -1,23 +1,25 @@
 #!/usr/bin/stap
 
-global datalength;
+global retlen[8192];
 
 probe begin
 {
-	printf("Tracing packet length of recvfrom()... Hit Ctrl-C to end.\n");
+    printf("Tracing packet length of socket.receive... Hit Ctrl-C to end.\n");
 }
 
 /* socket reads */
-probe nd_syscall.recvfrom.return
+probe socket.receive
 {
-    datalength[pid()] << returnval();
+    if (success) {
+        retlen[pid(), protocol] <<< size;
+    }
 }
 
 probe end
 {
-	printf("statistics:\n");
-	foreach ([pid] in datalength) {
-		printf("PID: %-5d\n", pid);
-		print(@hist_log(datalength[pid]));
-	}
+    printf("statistics:\n");
+    foreach ([pid, protocol] in retlen) {
+        printf("PID: %-5d %-12s PROTO: %-6d\n", pid, pid2execname(pid), protocol);
+        print(@hist_log(retlen[pid, protocol]));
+    }
 }
