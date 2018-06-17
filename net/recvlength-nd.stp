@@ -1,0 +1,23 @@
+#!/usr/bin/stap
+
+global datalength;
+
+probe begin
+{
+	printf("Tracing packet length of recvfrom()... Hit Ctrl-C to end.\n");
+}
+
+/* socket reads */
+probe nd_syscall.recvfrom.return
+{
+    datalength[pid()] << returnval();
+}
+
+probe end
+{
+	printf("statistics:\n");
+	foreach ([pid] in datalength) {
+		printf("PID: %-5d\n", pid);
+		print(@hist_log(datalength[pid]));
+	}
+}
