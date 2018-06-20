@@ -1,0 +1,44 @@
+#!/usr/bin/stap
+
+global duration[65535];
+global ts[65535];
+global min_ns;
+
+probe begin
+{
+	if (argv_1 != "") {
+        min_ns = strtol(argv_1, 10) * 1000000;
+		printf("Only tracing events slower than %s ms.\n", argv_1);
+    } else {
+		min_ns = 0;
+    }
+
+	printf("%-24s %-6s %-14s %-4s %s\n", "TIME", "PID", "COMM", "FD",
+	    "DURATION");
+}
+
+probe nd_syscall.connect
+{
+	ts[tid(), int_arg(1)] = gettimeofday_ns();
+}
+
+probe nd_syscall.connect.return
+{
+    last = ts[tid(), int_arg(1)];
+    if (last) {
+        delta = gettimeofday_ns() - last;
+        if (delta >= min_ns) {
+            printf("%-24s %-6d %-14s %-4d %d ms\n",
+			    ctime(gettimeofday_s()),
+			    pid(), execname(), int_arg(1), delta / 1000000);
+            duration <<< delta;
+        }
+        delete ts[tid(), int_arg(1)];
+    }
+}
+
+probe end
+{
+	printf("\nDuration (ns):\n");
+	if (@count(duration)) { print(@hist_log(duration)); }
+}
